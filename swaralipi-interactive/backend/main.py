@@ -48,7 +48,10 @@ def analyze(req: AnalyzeRequest):
         b64 = normalize_base64(req.image_base64)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image data: {e}")
-    class_id, confidence = run_inference(b64)
+    try:
+        class_id, confidence = run_inference(b64)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
     if class_id is None:
         return {
             "success": True,
@@ -62,7 +65,10 @@ def analyze(req: AnalyzeRequest):
     class_name = info["english_name"]
     hindi_symbol = info["hindi_symbol"]
     timestamp = datetime.utcnow().isoformat() + "Z"
-    insert_scan(timestamp, class_name, class_id, confidence, b64)
+    try:
+        insert_scan(timestamp, class_name, class_id, confidence, b64)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save scan: {e}")
     return {
         "success": True,
         "class_id": class_id,

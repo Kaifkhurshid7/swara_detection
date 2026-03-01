@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactCrop, { type Crop, type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
-import { analyzeCrop, getApiBase, type AnalyzeResponse } from "../api/client";
+import { analyzeCrop, getUserFacingApiError, type AnalyzeResponse } from "../api/client";
 import NeuralTooltip from "../components/NeuralTooltip";
 import { Loader2, ArrowLeft, AlertCircle } from "lucide-react";
 
@@ -51,14 +51,14 @@ export default function Result() {
         const data = await analyzeCrop(base64);
         setResult(data);
       } catch (err) {
-        const apiBase = getApiBase();
+        const message = getUserFacingApiError(err, "analyze");
         setResult({
           success: false,
           class_id: null,
           class_name: null,
           hindi_symbol: null,
           confidence: 0,
-          message: `Backend not reachable. Start it (e.g. run-backend.bat), then ensure it runs at ${apiBase}`,
+          message,
         });
       } finally {
         setLoading(false);
@@ -75,7 +75,7 @@ export default function Result() {
     );
   }
 
-  const isBackendError = result?.message && result.message.includes("not reachable");
+  const isBackendError = !!result?.message?.toLowerCase().includes("backend not reachable");
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex flex-col lg:flex-row bg-neutral-50">
@@ -94,9 +94,10 @@ export default function Result() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-neutral-500">
             <Loader2 className="w-10 h-10 text-neutral-900 animate-spin" />
-            <span className="text-sm">Detecting swara…</span>
+            <span className="text-sm">Detecting swara...</span>
           </div>
         )}
+
         {!loading && result && result.class_id != null && result.hindi_symbol && (
           <NeuralTooltip
             hindiSymbol={result.hindi_symbol}

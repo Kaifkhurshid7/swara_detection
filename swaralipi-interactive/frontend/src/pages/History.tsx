@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getHistory, getApiBase, type HistoryScan } from "../api/client";
+import { getHistory, getUserFacingApiError, type HistoryScan } from "../api/client";
 import { Loader2, Music2, AlertCircle } from "lucide-react";
 
 function formatTime(iso: string) {
@@ -19,9 +19,10 @@ export default function History() {
   useEffect(() => {
     getHistory()
       .then((res) => setScans(res.scans || []))
-      .catch(() => setError(`Backend not reachable. Start it at ${getApiBase()} (e.g. run-backend.bat).`))
+      .catch((err) => setError(getUserFacingApiError(err, "history")))
       .finally(() => setLoading(false));
   }, []);
+
 
   if (loading) {
     return (

@@ -8,13 +8,37 @@ import torch
 from pathlib import Path
 from PIL import Image
 from ultralytics import YOLO
-from ultralytics.nn.tasks import DetectionModel  # <-- 1. Imported DetectionModel
+from ultralytics.nn.tasks import DetectionModel
 
-# Fix for PyTorch 2.4+ weights_only restriction when loading older ultralytics checkpoints
-# <-- 2. Added DetectionModel to the list below
-torch.serialization.add_safe_globals([
-    set, dict, list, tuple, torch.nn.Module, torch.nn.Parameter, torch.Tensor, DetectionModel
-])
+# Fix for PyTorch weights_only restrictions when loading Ultralytics checkpoints.
+# We allowlist only known model/container classes used by YOLO weights in this project.
+_safe_globals = [
+    set,
+    dict,
+    list,
+    tuple,
+    torch.nn.Module,
+    torch.nn.ModuleList,
+    torch.nn.Parameter,
+    torch.Tensor,
+    torch.nn.Sequential,
+    torch.nn.Conv2d,
+    torch.nn.BatchNorm2d,
+    torch.nn.SiLU,
+    torch.nn.ReLU,
+    torch.nn.Upsample,
+    torch.nn.MaxPool2d,
+    torch.nn.Identity,
+    DetectionModel,
+]
+
+try:
+    from ultralytics.nn.modules import Conv, C2f, SPPF, Detect, DFL, Bottleneck, Concat
+    _safe_globals.extend([Conv, C2f, SPPF, Detect, DFL, Bottleneck, Concat])
+except Exception:
+    pass
+
+torch.serialization.add_safe_globals(_safe_globals)
 
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "best.pt"
 _model = None
@@ -42,13 +66,17 @@ def run_inference(base64_image: str, conf_threshold: float = 0.25):
 
     try:
         img_bytes = io.BytesIO(raw)
-        image = Image.open(img_bytes)
+        image = Image.open(img_bytes).convert("RGB")
     except Exception as e:
         print(f"Image parsing error: {e}")
         return None, 0.0
 
-    model = _get_model()
-    results = model.predict(source=image, conf=conf_threshold, verbose=False)
+    try:
+        model = _get_model()
+        results = model.predict(source=image, conf=conf_threshold, verbose=False)
+    except Exception as e:
+        print(f"Inference error: {e}")
+        return None, 0.0
 
     best_id, best_conf = None, 0.0
     for r in results:

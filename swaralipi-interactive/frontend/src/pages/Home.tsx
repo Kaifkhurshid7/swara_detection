@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ScanLine, History, Crop, ArrowRight, Zap, Database } from "lucide-react";
+import { ScanLine, History, Crop, ArrowRight, Database } from "lucide-react";
 
 export default function Home() {
   return (

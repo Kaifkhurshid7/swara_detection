@@ -1,146 +1,157 @@
-import React, { useState, useCallback, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Webcam from "react-webcam";
-import {
-  Upload,
-  Camera,
-  Loader2,
-  ArrowLeft,
-  Cpu,
-  Zap,
-  AlertCircle
-} from "lucide-react";
-import { isMobile } from "../utils/device";
+import { Camera, Upload, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 
 const SCAN_IMAGE_KEY = "swaralipi_scan_image";
 
 export default function Scanner() {
   const navigate = useNavigate();
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "processing">("idle");
   const webcamRef = useRef<Webcam>(null);
-  const mobile = isMobile();
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleDataIngestion = useCallback(
-    (dataUrl: string) => {
-      setStatus("processing");
-      try {
-        localStorage.setItem(SCAN_IMAGE_KEY, dataUrl);
-        setTimeout(() => navigate("/result"), 1200);
-      } catch (e) {
-        setStatus("idle");
-        setFileError("IMAGE_TOO_LARGE: Please use a standard resolution photo.");
-      }
-    },
-    [navigate]
-  );
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFileError(null);
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) {
-      setFileError("INVALID_TYPE: Please upload a JPG or PNG.");
-      return;
+  const capture = useCallback(() => {
+    const imageSrc = webcamRef.current?.getScreenshot();
+    if (imageSrc) {
+      setImgSrc(imageSrc);
     }
-    const reader = new FileReader();
-    reader.onload = () => handleDataIngestion(reader.result as string);
-    reader.readAsDataURL(file);
+  }, [webcamRef]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        setError("Please upload an image file.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImgSrc(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const confirmImage = () => {
+    if (imgSrc) {
+      localStorage.setItem(SCAN_IMAGE_KEY, imgSrc);
+      navigate("/result");
+    }
+  };
+
+  const reset = () => {
+    setImgSrc(null);
+    setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center p-8">
-
-      {/* Minimalist Top Navigation */}
-      <div className="w-full max-w-2xl flex justify-start mb-12">
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-neutral-400 hover:text-black transition-colors group"
-        >
-          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Back to Terminal</span>
-        </button>
+    <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="text-center mb-10">
+        <h1 className="text-3xl font-bold text-neutral-900 mb-3">Initialize Scan</h1>
+        <p className="text-neutral-500">
+          Capture a photo of your notation or upload an existing image to start analysis.
+        </p>
       </div>
 
-      <div className="w-full max-w-xl text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-neutral-900 mb-2">
-          Ingest Notation
-        </h1>
-        <p className="text-neutral-400 text-sm font-medium mb-10">
-          Ensure high-quality, high-contrast imagery for optimal neural accuracy.
-        </p>
+      <div className="grid md:grid-cols-2 gap-8 items-start">
+        {/* Left: Capture/Preview Area */}
+        <div className="space-y-6">
+          <div className="aspect-[4/3] bg-neutral-100 rounded-2xl border-2 border-dashed border-neutral-200 overflow-hidden relative flex items-center justify-center">
+            {!imgSrc ? (
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/png"
+                className="w-full h-full object-cover"
+                videoConstraints={{ facingMode: "environment" }}
+                onUserMediaError={() => setError("Could not access camera. Please allow camera permissions.")}
+              />
+            ) : (
+              <img src={imgSrc} alt="Captured" className="w-full h-full object-contain" />
+            )}
 
-        <div className="relative group">
-          <div className="bg-white rounded-3xl border border-neutral-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
-            {mobile ? (
-              <div className="p-4">
-                <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-neutral-100">
-                  <Webcam
-                    ref={webcamRef}
-                    audio={false}
-                    screenshotFormat="image/jpeg"
-                    className="absolute inset-0 w-full h-full object-cover"
-                    videoConstraints={{ facingMode: "environment" }}
-                  />
-
-                  {/* Subtle Optic Guides */}
-                  <div className="absolute inset-0 border-[2px] border-white/20 m-6 rounded-lg pointer-events-none" />
-
-                  {status === "processing" && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in">
-                      <div className="relative">
-                        <Loader2 className="w-10 h-10 text-neutral-900 animate-spin" />
-                        <Cpu className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 text-neutral-900" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
+            {error && (
+              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+                <AlertCircle className="w-12 h-12 text-amber-500 mb-4" />
+                <p className="text-neutral-900 font-medium mb-2">{error}</p>
                 <button
-                  onClick={() => {
-                    const src = webcamRef.current?.getScreenshot();
-                    if (src) handleDataIngestion(src);
-                  }}
-                  disabled={status === "processing"}
-                  className="mt-4 w-full h-14 rounded-2xl bg-neutral-900 text-white flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-50"
+                  onClick={() => setError(null)}
+                  className="text-sm font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-900"
                 >
-                  <Zap className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  <span className="font-bold uppercase tracking-widest text-[11px]">Capture Manuscript</span>
+                  Dismiss
                 </button>
               </div>
-            ) : (
-              <div className="p-2">
-                <label className="block cursor-pointer">
-                  <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={status === "processing"} />
-                  <div className="flex flex-col items-center justify-center py-20 px-10 rounded-2xl border-2 border-dashed border-neutral-100 hover:border-neutral-900 bg-neutral-50/30 hover:bg-white transition-all duration-500">
+            )}
+          </div>
 
-                    {status === "processing" ? (
-                      <div className="flex flex-col items-center gap-4">
-                        <Loader2 className="w-8 h-8 text-neutral-900 animate-spin" />
-                        <span className="text-neutral-900 font-bold text-[10px] uppercase tracking-widest">Optimizing Data...</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="w-14 h-14 bg-white border border-neutral-200 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-                          <Upload className="w-5 h-5 text-neutral-400" />
-                        </div>
-                        <h3 className="text-neutral-900 font-bold uppercase tracking-widest text-[10px] mb-2">Upload Source File</h3>
-                        <p className="text-neutral-400 text-xs">Drop image or click to browse</p>
-                      </>
-                    )}
-                  </div>
-                </label>
-              </div>
+          <div className="flex gap-4">
+            {!imgSrc ? (
+              <button
+                onClick={capture}
+                className="flex-1 bg-neutral-900 text-white rounded-xl h-14 font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors"
+              >
+                <Camera className="w-5 h-5" /> Capture Photo
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={reset}
+                  className="flex-1 bg-neutral-100 text-neutral-600 rounded-xl h-14 font-bold flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors"
+                >
+                  <RefreshCw className="w-5 h-5" /> Retake
+                </button>
+                <button
+                  onClick={confirmImage}
+                  className="flex-1 bg-neutral-900 text-white rounded-xl h-14 font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors"
+                >
+                  <CheckCircle2 className="w-5 h-5" /> Use Image
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        {/* Minimal Error Box */}
-        {fileError && (
-          <div className="mt-8 flex items-center justify-center gap-2 text-red-500">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">{fileError}</span>
+        {/* Right: Upload Options */}
+        <div className="space-y-6">
+          <div className="p-8 rounded-2xl border border-neutral-200 bg-white shadow-sm">
+            <h3 className="text-lg font-bold text-neutral-900 mb-6 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-neutral-400" /> Upload File
+            </h3>
+
+            <label className="block">
+              <span className="sr-only">Choose notation image</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="block w-full text-sm text-neutral-500
+                  file:mr-4 file:py-3 file:px-6
+                  file:rounded-xl file:border-0
+                  file:text-sm file:font-bold file:uppercase file:tracking-widest
+                  file:bg-neutral-100 file:text-neutral-700
+                  hover:file:bg-neutral-200 transition-all cursor-pointer"
+              />
+            </label>
+
+            <div className="mt-10 p-6 rounded-xl bg-neutral-50 border border-neutral-100">
+              <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Tips for best results</h4>
+              <ul className="space-y-3">
+                {[
+                  "Ensure good lighting and high contrast",
+                  "Keep the camera parallel to the sheet",
+                  "Avoid shadows and motion blur",
+                  "Capture a single system or line at a time"
+                ].map((tip, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-neutral-600">
+                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-300 mt-1.5 flex-shrink-0" />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
