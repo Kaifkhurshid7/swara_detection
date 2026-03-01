@@ -84,4 +84,3 @@ export async function getHistory(): Promise<HistoryResponse> {
   const { data } = await client.get<HistoryResponse>("/history");
   return data;
 }
-

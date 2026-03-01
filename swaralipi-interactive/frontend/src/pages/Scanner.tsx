@@ -1,157 +1,163 @@
-import { useState, useRef, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Webcam from "react-webcam";
-import { Camera, Upload, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Upload,
+  Camera,
+  Loader2,
+  ArrowLeft,
+  Cpu,
+  Zap,
+  AlertCircle
+} from "lucide-react";
+import { isMobile } from "../utils/device";
 
 const SCAN_IMAGE_KEY = "swaralipi_scan_image";
 
 export default function Scanner() {
   const navigate = useNavigate();
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "processing">("idle");
   const webcamRef = useRef<Webcam>(null);
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const mobile = isMobile();
 
-  const capture = useCallback(() => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (imageSrc) {
-      setImgSrc(imageSrc);
-    }
-  }, [webcamRef]);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        setError("Please upload an image file.");
-        return;
+  // Internal logic for neural ingestion simulation
+  const handleDataIngestion = useCallback(
+    (dataUrl: string) => {
+      setStatus("processing");
+      try {
+        localStorage.setItem(SCAN_IMAGE_KEY, dataUrl);
+        // Artificial delay to simulate neural network warm-up
+        setTimeout(() => navigate("/result"), 1200);
+      } catch (e) {
+        setStatus("idle");
+        setFileError("BUFFER_OVERFLOW: Image resolution is too high for local storage.");
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImgSrc(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+    },
+    [navigate]
+  );
 
-  const confirmImage = () => {
-    if (imgSrc) {
-      localStorage.setItem(SCAN_IMAGE_KEY, imgSrc);
-      navigate("/result");
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError(null);
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) {
+      setFileError("FORMAT_REJECTED: Please provide a standard JPG or PNG.");
+      return;
     }
-  };
-
-  const reset = () => {
-    setImgSrc(null);
-    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => handleDataIngestion(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-neutral-900 mb-3">Initialize Scan</h1>
-        <p className="text-neutral-500">
-          Capture a photo of your notation or upload an existing image to start analysis.
-        </p>
+    <div className="min-h-screen bg-[#FBFBFB] flex flex-col items-center p-8 selection:bg-neutral-900 selection:text-white">
+
+      {/* Minimalist Navigation */}
+      <div className="w-full max-w-2xl flex justify-start mb-16">
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 text-neutral-400 hover:text-black transition-all group"
+        >
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Terminus</span>
+        </button>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8 items-start">
-        {/* Left: Capture/Preview Area */}
-        <div className="space-y-6">
-          <div className="aspect-[4/3] bg-neutral-100 rounded-2xl border-2 border-dashed border-neutral-200 overflow-hidden relative flex items-center justify-center">
-            {!imgSrc ? (
-              <Webcam
-                audio={false}
-                ref={webcamRef}
-                screenshotFormat="image/png"
-                className="w-full h-full object-cover"
-                videoConstraints={{ facingMode: "environment" }}
-                onUserMediaError={() => setError("Could not access camera. Please allow camera permissions.")}
-              />
-            ) : (
-              <img src={imgSrc} alt="Captured" className="w-full h-full object-contain" />
-            )}
+      <div className="w-full max-w-xl">
+        {/* Header Section */}
+        <div className="text-center mb-12">
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 mb-3">
+            Scan Swara Notation
+          </h1>
+          <p className="text-neutral-500 text-sm font-medium">
+            Supply high-contrast manuscript data for optimal neural classification.
+          </p>
+        </div>
 
-            {error && (
-              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
-                <AlertCircle className="w-12 h-12 text-amber-500 mb-4" />
-                <p className="text-neutral-900 font-medium mb-2">{error}</p>
-                <button
-                  onClick={() => setError(null)}
-                  className="text-sm font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-900"
-                >
-                  Dismiss
-                </button>
+        {/* Interface Module */}
+        <div className="bg-white rounded-[2.5rem] border border-neutral-200 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
+          {mobile ? (
+            <div className="p-5">
+              <div className="relative aspect-[4/5] rounded-[1.8rem] overflow-hidden bg-neutral-100 border border-neutral-200/50">
+                <Webcam
+                  ref={webcamRef}
+                  audio={false}
+                  screenshotFormat="image/jpeg"
+                  className="absolute inset-0 w-full h-full object-cover grayscale-[0.2]"
+                  videoConstraints={{ facingMode: "environment" }}
+                />
+
+                {/* Minimal Optic Viewfinder */}
+                <div className="absolute inset-8 border border-white/30 rounded-lg pointer-events-none">
+                  <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-white" />
+                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-white" />
+                </div>
+
+                {status === "processing" && (
+                  <div className="absolute inset-0 bg-white/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="relative">
+                      <Loader2 className="w-10 h-10 text-neutral-900 animate-spin opacity-20" />
+                      <Cpu className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 text-neutral-900 animate-pulse" />
+                    </div>
+                    <span className="mt-4 text-[9px] font-black uppercase tracking-[0.3em] text-neutral-900">Processing</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="flex gap-4">
-            {!imgSrc ? (
+              {/* Refined Capture Button */}
               <button
-                onClick={capture}
-                className="flex-1 bg-neutral-900 text-white rounded-xl h-14 font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors"
+                onClick={() => {
+                  const src = webcamRef.current?.getScreenshot();
+                  if (src) handleDataIngestion(src);
+                }}
+                disabled={status === "processing"}
+                className="mt-6 w-full h-14 rounded-2xl border border-neutral-900 bg-white text-neutral-900 flex items-center justify-center gap-3 hover:bg-neutral-900 hover:text-white transition-all active:scale-[0.98] disabled:opacity-30 group"
               >
-                <Camera className="w-5 h-5" /> Capture Photo
+                {/* <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center group-hover:bg-neutral-800 transition-colors">
+                  <Zap className="w-3.5 h-3.5 text-neutral-900 group-hover:text-yellow-400 fill-current transition-colors" />
+                </div> */}
+                <span className="font-bold uppercase tracking-[0.2em] text-[10px]">Swara Capture</span>
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={reset}
-                  className="flex-1 bg-neutral-100 text-neutral-600 rounded-xl h-14 font-bold flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors"
-                >
-                  <RefreshCw className="w-5 h-5" /> Retake
-                </button>
-                <button
-                  onClick={confirmImage}
-                  className="flex-1 bg-neutral-900 text-white rounded-xl h-14 font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors"
-                >
-                  <CheckCircle2 className="w-5 h-5" /> Use Image
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Upload Options */}
-        <div className="space-y-6">
-          <div className="p-8 rounded-2xl border border-neutral-200 bg-white shadow-sm">
-            <h3 className="text-lg font-bold text-neutral-900 mb-6 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-neutral-400" /> Upload File
-            </h3>
-
-            <label className="block">
-              <span className="sr-only">Choose notation image</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="block w-full text-sm text-neutral-500
-                  file:mr-4 file:py-3 file:px-6
-                  file:rounded-xl file:border-0
-                  file:text-sm file:font-bold file:uppercase file:tracking-widest
-                  file:bg-neutral-100 file:text-neutral-700
-                  hover:file:bg-neutral-200 transition-all cursor-pointer"
-              />
-            </label>
-
-            <div className="mt-10 p-6 rounded-xl bg-neutral-50 border border-neutral-100">
-              <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Tips for best results</h4>
-              <ul className="space-y-3">
-                {[
-                  "Ensure good lighting and high contrast",
-                  "Keep the camera parallel to the sheet",
-                  "Avoid shadows and motion blur",
-                  "Capture a single system or line at a time"
-                ].map((tip, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-neutral-600">
-                    <div className="w-1.5 h-1.5 rounded-full bg-neutral-300 mt-1.5 flex-shrink-0" />
-                    {tip}
-                  </li>
-                ))}
-              </ul>
             </div>
-          </div>
+          ) : (
+            <div className="p-3">
+              <label className="block cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFile}
+                  disabled={status === "processing"}
+                />
+                <div className="flex flex-col items-center justify-center py-24 px-10 rounded-[1.8rem] border-2 border-dashed border-neutral-100 hover:border-neutral-900 bg-neutral-50/30 hover:bg-white transition-all duration-700">
+
+                  {status === "processing" ? (
+                    <div className="flex flex-col items-center gap-5">
+                      <Loader2 className="w-8 h-8 text-neutral-900 animate-spin" />
+                      <span className="text-neutral-900 font-black text-[10px] uppercase tracking-[0.2em]">Optimizing Port...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 bg-white border border-neutral-100 rounded-3xl flex items-center justify-center mb-6 shadow-sm group-hover:shadow-lg transition-all">
+                        <Upload className="w-5 h-5 text-neutral-400" />
+                      </div>
+                      <h3 className="text-neutral-900 font-black uppercase tracking-[0.2em] text-[10px] mb-2">Initialize Data Port</h3>
+                      <p className="text-neutral-400 text-xs font-medium">Drag manuscript or click to browse</p>
+                    </>
+                  )}
+                </div>
+              </label>
+            </div>
+          )}
         </div>
+
+        {/* Exception Display */}
+        {fileError && (
+          <div className="mt-10 p-4 border border-red-100 bg-red-50/50 rounded-2xl flex items-center justify-center gap-3 animate-in slide-in-from-bottom-2">
+            <AlertCircle className="w-4 h-4 text-red-500" />
+            <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">{fileError}</span>
+          </div>
+        )}
       </div>
     </div>
   );
