@@ -3,11 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Webcam from "react-webcam";
 import {
   Upload,
-  Camera,
   Loader2,
   ArrowLeft,
   Cpu,
-  Zap,
   AlertCircle
 } from "lucide-react";
 import { isMobile } from "../utils/device";
