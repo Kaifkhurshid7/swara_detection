@@ -12,12 +12,20 @@ function getCroppedImageSrc(image: HTMLImageElement, crop: PixelCrop): string {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (!ctx) return "";
-  const scale = 1;
-  canvas.width = crop.width * scale;
-  canvas.height = crop.height * scale;
+
+  // ReactCrop gives crop in rendered-image pixels; map to natural-image pixels.
+  const scaleX = image.naturalWidth / image.width;
+  const scaleY = image.naturalHeight / image.height;
+  const sx = Math.max(0, Math.floor(crop.x * scaleX));
+  const sy = Math.max(0, Math.floor(crop.y * scaleY));
+  const sw = Math.max(1, Math.floor(crop.width * scaleX));
+  const sh = Math.max(1, Math.floor(crop.height * scaleY));
+
+  canvas.width = sw;
+  canvas.height = sh;
   ctx.drawImage(
     image,
-    crop.x, crop.y, crop.width, crop.height,
+    sx, sy, sw, sh,
     0, 0, canvas.width, canvas.height
   );
   return canvas.toDataURL("image/png");

@@ -43,6 +43,24 @@ torch.serialization.add_safe_globals(_safe_globals)
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "best.pt"
 _model = None
 
+def _tight_crop_foreground(image: Image.Image, white_threshold: int = 245, margin: int = 4) -> Image.Image:
+    """
+    Trim near-white background so the swara symbol fills more of the frame.
+    This helps when UI crop contains large blank margins.
+    """
+    gray = image.convert("L")
+    mask = gray.point(lambda p: 0 if p > white_threshold else 255)
+    bbox = mask.getbbox()
+    if not bbox:
+        return image
+
+    left, top, right, bottom = bbox
+    left = max(0, left - margin)
+    top = max(0, top - margin)
+    right = min(image.width, right + margin)
+    bottom = min(image.height, bottom + margin)
+    return image.crop((left, top, right, bottom))
+
 def _get_model():
     global _model
     if _model is None:
@@ -67,25 +85,35 @@ def run_inference(base64_image: str, conf_threshold: float = 0.25):
     try:
         img_bytes = io.BytesIO(raw)
         image = Image.open(img_bytes).convert("RGB")
+        image = _tight_crop_foreground(image)
     except Exception as e:
         print(f"Image parsing error: {e}")
         return None, 0.0
 
     try:
         model = _get_model()
-        results = model.predict(source=image, conf=conf_threshold, verbose=False)
+        tight = _tight_crop_foreground(image)
+        sources = [tight]
+        if tight.size != image.size:
+            sources.append(image)
     except Exception as e:
-        print(f"Inference error: {e}")
+        print(f"Inference prep error: {e}")
         return None, 0.0
 
     best_id, best_conf = None, 0.0
-    for r in results:
-        if r.boxes is None:
-            continue
-        for box in r.boxes:
-            conf = float(box.conf[0])
-            if conf > best_conf:
-                best_conf = conf
-                best_id = int(box.cls[0])
+    try:
+        for src in sources:
+            results = model.predict(source=src, conf=conf_threshold, verbose=False)
+            for r in results:
+                if r.boxes is None:
+                    continue
+                for box in r.boxes:
+                    conf = float(box.conf[0])
+                    if conf > best_conf:
+                        best_conf = conf
+                        best_id = int(box.cls[0])
+    except Exception as e:
+        print(f"Inference error: {e}")
+        return None, 0.0
                 
     return best_id, best_conf
